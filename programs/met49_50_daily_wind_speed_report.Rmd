@@ -1,0 +1,175 @@
+---
+title: "SEV Met 49 & 50 Daily Report"
+author: "KM Hall"
+output: html_document
+---
+
+**Daily report for SEV meteorological stations 49 and 50.**  
+
+----
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(lubridate)
+library(kableExtra)
+library(openair)
+
+year_last2 <- substr(year(today()), 3, 4)
+
+met <- read_csv(paste0("~/Documents/SEV/Projects/Meteorological_Data_Processing/data_output_files/hourly_filtered_", year_last2, ".csv", sep = ""),
+                guess_max = 100000)
+
+```
+Date of report: `r today()`  
+
+
+----  
+
+
+**Maximum daily wind speed (mph) for the 7 days preceeding the date of the report:**    
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# add ue and un for wind components
+met_w <- met %>% 
+  mutate(ue = vms * sin(dir * pi / 180),
+         un = vms * cos(dir * pi / 180))
+
+
+week_daily <- 
+  met_w %>%
+  filter(date >= (today() -7) & date < today(), 
+         sta %in% c(49, 50)) %>%
+  group_by(sta, date) %>%
+  summarize(Maximum_Daily_Wind_Speed_mph = round(max(maxw, na.rm = TRUE)*2.23694, 2),
+            Mean_Temperature_C = round(mean(airt, na.rm = TRUE), 1),
+            Minimum_Temperature_C = round(min(minair, na.rm = TRUE), 1),
+            Maximum_Temperature_C = round(max(maxair,na.rm = TRUE), 1),
+            Precipitation_mm = round(sum(ppt, na.rm = TRUE), 3),
+            Ue = mean(ue, na.rm = TRUE),
+            Un = mean(un, na.rm = TRUE),
+            Mean_Wind_Speed_mph = round(mean(ms, na.rm = TRUE) * 2.23694, 2),
+            Mean_Vectored_Wind_Speed_mph = round(sqrt(Ue^2 + Un^2) * 2.23694, 2),
+            vwd_pre = atan2(Ue, Un) / pi * 180,
+            Mean_Vectored_Wind_Direction_mph = round(ifelse(vwd_pre < 0, (vwd_pre + 360), vwd_pre), 2)) %>% 
+  rename(Date = date, Station = sta) %>% 
+  select(-c(Ue, Un, vwd_pre))
+
+# Coversion of m/s to mph: multiply m/s by 2.23694
+
+week_daily %>% 
+  filter(Station == 49) %>% 
+  kable() %>%
+  kable_styling(full_width = FALSE, position = "left", bootstrap_options = c("striped"))
+
+week_daily %>% 
+  filter(Station == 50) %>% 
+  kable() %>%
+  kable_styling(full_width = FALSE, position = "left", bootstrap_options = c("striped"))
+
+  
+ggplot(week_daily, aes(x = Date, y = Maximum_Daily_Wind_Speed_mph)) +
+  geom_line() +
+  facet_wrap(~ Station) +
+  labs(title = "Maximum Daily Wind Speed (mph) for the 7 Days Preceeding the Report Date") +
+  xlab("Date") +
+  ylab("Maximum Daily Wind Speed (mph)")
+```
+
+
+----  
+
+```{r, echo=FALSE}
+ggplot(week_daily, aes(x = Date, y = Mean_Temperature_C)) +
+  geom_line() +
+  facet_wrap(~ Station) +
+  labs(title = "Mean Daily Temperature (C) for the 7 Days Preceeding the Report Date") +
+  xlab("Date") +
+  ylab("Mean Daily Temperature (C)")
+```
+
+----  
+
+```{r, echo=FALSE}
+ggplot(week_daily, aes(x = Date, y = Precipitation_mm)) +
+  geom_point(size = 0.6) +
+  facet_wrap(~ Station) +
+  labs(title = "Total Daily Precipitation (mm) for the 7 Days Preceeding the Report Date") +
+  xlab("Date") +
+  ylab("Total Daily Precipitation (mm)")
+```
+
+
+----  
+
+Vectored wind direction and speed for the previous day (direction the wind is out of):  
+**Station 49:**  
+```{r, echo=FALSE}
+wind_data <- met_w %>%
+  filter(date == today() - 1) %>%
+  select(sta, date, dir, vms) %>%
+  rename(wd = dir, ws = vms)
+
+wind_data_49 <- wind_data %>% filter(sta == 49)
+wind_data_50 <- wind_data %>% filter(sta == 50)
+
+
+
+polarFreq(wind_data_49)
+```
+
+**Station 50:**  
+```{r, echo=FALSE}
+polarFreq(wind_data_50)
+```
+
+
+----  
+
+
+```{r, echo = FALSE}
+max_wind_yesterday <- week_daily %>% 
+  filter(Date == (today() - 1)) 
+
+yesterday49 <- max_wind_yesterday %>% 
+  select(Station, Maximum_Daily_Wind_Speed_mph) %>% 
+  filter(Station == 49) %>% 
+  ungroup()
+
+
+yesterday50 <- max_wind_yesterday %>% 
+  select(Station, Maximum_Daily_Wind_Speed_mph) %>% 
+  filter(Station == 50) %>% 
+  ungroup()
+
+```
+
+----
+
+**Yesterday's maximum wind speed for station 49 was `r round(yesterday49 %>% select(Maximum_Daily_Wind_Speed_mph), 2)` mph.**  
+
+**Yesterday's maximum wind speed for station 50 was `r round(yesterday50 %>% select(Maximum_Daily_Wind_Speed_mph), 2)` mph.**  
+
+```{r, echo = FALSE}
+waswindy49 <- 
+  yesterday49 %>% 
+  summarize(ifelse(Maximum_Daily_Wind_Speed_mph >= 45,
+                   "IT WAS WINDY AT STATION 49! There were gusts >= 45 mph.",
+                   "No, it was a pretty nice day at Station 49."))
+
+waswindy50 <-
+  yesterday50 %>% 
+  summarize(ifelse(Maximum_Daily_Wind_Speed_mph >= 45,
+                   "IT WAS WINDY AT STATION 50! There were gusts >= 45 mph.",
+                   "No, it was a pretty nice day at Station 50."))
+```
+
+----
+**Was it windy yesterday?**  
+
+**`r waswindy49`**  
+
+**`r waswindy50`**  
+
+
+
+

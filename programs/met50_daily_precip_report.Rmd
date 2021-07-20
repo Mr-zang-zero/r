@@ -1,0 +1,63 @@
+---
+title: "Met50 Precipitation (mm)"
+author: "KM Hall"
+output: html_document
+---
+
+```{r, include = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+
+met_data <- read_csv("~/Documents/SEV/Projects/Meteorological_Data_Processing/data_output_files/hourly_filtered_21.csv", guess_max = 100000)
+
+met_data <- met_data %>% 
+  mutate(sta = as.factor(sta))
+
+```
+Report Date: `r today()`  
+
+
+-----  
+
+**File date range:**  
+
+```{r, echo=FALSE}
+met_data %>% 
+  filter(sta == '50') %>% 
+  summarize(min_date = min(dt, na.rm = TRUE),
+            max_date = max(dt, na.rm = TRUE),
+            count    = n()) %>% 
+  knitr::kable()
+
+```
+
+-----  
+
+**Daily Precipitation for the past month:**  
+
+```{r, echo=FALSE}
+month_to_process <- month(today())
+
+met50_precip <-
+  met_data %>%
+  filter(sta == '50' & month >= month_to_process) %>%
+  group_by(date) %>%
+  summarize(precip_total_mm = sum(ppt, na.rm = TRUE),
+            no_hrly_records = sum(!is.na(ppt), na.rm = TRUE))
+
+
+met50_precip %>% 
+  knitr::kable() 
+```
+
+-----  
+
+```{r, echo = FALSE}
+  ggplot(met50_precip, aes(x = date, y = precip_total_mm)) +
+  geom_point() +
+  labs(title = paste0("Daily Precipitation (mm) for Station 50 for month ", month_to_process, "-", year(today()), sep = ""), x = "Date", y = "Precipitation (mm)")
+```
+
+
